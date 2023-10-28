@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chatApp Project</title>
+
+    <!-- <style href="../public/style.css"></style> -->
+    <!-- <link rel="stylesheet" href="../public/style.css" type="text/css"> -->
+    <style>
+        .box {
+            height: 400px;
+            width: 350px;
+            color: blue;
+            background-color: rgb(128, 187, 232);
+            text-align: center;
+            border-radius: 20px;
+            margin-top: 150px;
+            display: flex;
+            align-items: center;
+        }
+        /* .box form table{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        } */
+    </style>
+</head>
+
+<body>
+
+    <center>
+        <div class="box">
+            <form action="/user/signUp" enctype="multipart/form-data" method="post">
+                <table>
+                    <!-- <tr>
+                        <td>ProfilePhoto :- </td>
+                        <td><input type="text" name="name"></td>
+                    </tr> -->
+                    <tr>
+                        <td>Name :- </td>
+                        <td><input type="text" name="name"></td>
+                    </tr>
+                    <tr>
+                        <td>Email :- </td>
+                        <td><input type="email" name="email"></td>
+                    </tr>
+                    <tr>
+                        <td>MobileNO :- </td>
+                        <td><input type="number" name="mobileNo"></td>
+                    </tr>
+                    <tr>
+                        <td>Password :- </td>
+                        <td><input type="password" name="password"></td>
+                    </tr>
+                    <tr>
+                        <!-- <td>Name :- </td> -->
+                        <td><input type="submit" name="submit" value="submit"></td>
+                    </tr>
+                </table>
+            </form>
+        </div>
+    </center>
+    
+    <!-- <form action="/user/signUp" enctype="multipart/form-data" method="post">
+        <table>
+            <tr>
+                <td>ProfilePhoto :- </td>
+                <td><input type="text" name="name"></td>
+            </tr>
+            <tr>
+                <td>Name :- </td>
+                <td><input type="text" name="name"></td>
+            </tr>
+            <tr>
+                <td>Email :- </td>
+                <td><input type="email" name="email"></td>
+            </tr>
+            <tr>
+                <td>MobileNO :- </td>
+                <td><input type="number" name="mobileNo"></td>
+            </tr>
+            <tr>
+                <td>Password :- </td>
+                <td><input type="password" name="password"></td>
+            </tr>
+            <tr>
+                <td><input type="submit" name="submit" value="submit"></td>
+            </tr>
+        </table>
+    </form> -->
+
+</body>
+
+</html>
