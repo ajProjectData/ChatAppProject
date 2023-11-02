@@ -4,7 +4,6 @@ const App = express();
 const bodyParser = require("body-parser");
 const userRoutes = require("./Routes/userRouter")
 const userChatRoutes = require("./Routes/userChatRouter")
-// const groupRoutes = require("./Routes/userGroupRouter")
 const path = require("path")
 
 // App.use(bodyParser.json())
@@ -17,39 +16,35 @@ App.use(express.static(path.join(__dirname, 'public')));
 App.set('views', path.join(__dirname, './views'));
 App.set('view engine', 'ejs')
 
+
+App.use(function (req, res, next) {
+    const origin = req?.headers?.origin;
+    const allowedOrigins = ["http://192.168.29.45:3000", "http://localhost:3000"]
+    // console.log("--->",allowedOrigins.includes(origin));
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+        res.header("Access-Control-Allow-Origin", "http://192.168.29.45:3000");
+    }
+    res.header("Access-Control-Allow-Credentials", true);
+    res.header("Access-Control-Allow-Methods", "GET,PATCH,PUT,POST,DELETE");
+    res.header("Access-Control-Expose-Headers", "Content-Length");
+    res.header(
+        "Access-Control-Allow-Headers",
+        "Accept, Authorization,x-auth-token, Content-Type, X-Requested-With, Range"
+    );
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(200);
+    } else {
+        return next();
+    }
+});
+
 App.get('/', function (req, res) {
     res.render('form');
 });
 
-// App.get('/', function (req, res) {
-//     res.sendFile(__dirname + '/form.ejs');
-// });
-//-------------- .env -------------
-// const dbConnect = require("./dbConfig/dbConnect");  
-// dbConnect()
-
-// const mongoose = require('mongoose');
-// mongoose.connect(dbConnectUrl)
-//   .then(() => console.log('Connected!')).catch((err) => {
-//     console.log("not ",err);
-//   })
-
-// mongoose.connect("mongodb://127.0.01:27017/ChatApp_project", {
-//     useNewUrlParser: true,
-//     useUnifiedTopology: true,
-// }).then((res) => {
-//     console.log("Successfull database connection");
-// })
-//     .catch((err) => {
-//         console.log(err);
-//     })
-// // mongoose.Promise = global.Promise; // Tell Mongoose to use ES6 promises
-// mongoose.connection.on("error", (err) => {
-//     console.error(`:no_entry_sign: Error → : ${err.message}`);
-// });
-
 App.use("/user", userRoutes)
 App.use("/", userChatRoutes)
-// App.use(groupRoutes)
 
 module.exports = App

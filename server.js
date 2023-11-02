@@ -317,7 +317,8 @@ io.on("connection", async (socket) => {
 
     // let data = await redisClient.lmPop("PracticeRedisMethod",2)
     // let data = await redisClient.sAdd("PracticeredisMethod",user.userId)
-    // let data = await redisClient.sInter("PracticeredisMethod", "connetUser")
+    // let data = await redisClient.sDiff("PracticeredisMethod", "connetUser")
+    // let data = await redisClient.sIsMember("PracticeredisMethod","64e6064240596af005813225")
     // let data = await redisClient.lPush("PracticeRedisMethod",user.userId)
     // console.log("data--->", data);
 
@@ -336,9 +337,10 @@ io.on("connection", async (socket) => {
     }
 
     /* ---------- Typing Event ---------- */
-    socket.on("Typing", (userData) => {
+    socket.on("Typing", async (userData) => {
         const groupId = userData.groupId
-        const findChatUser = users.find(val => val.userId === userData.chatUserId)
+        // const findChatUser = users.find(val => val.userId === userData.chatUserId)
+        const findChatUser = await redisClient.hGet(socketUserConnectRedisKey, userData.chatUserId)
         if (userData.message !== "") {
             if (groupId) {
                 socket.broadcast.to(groupId).emit("typing", {
@@ -668,12 +670,9 @@ io.allSockets().then((allSocket) => {
 
 const dbConnect = require("./dbConfig/dbConnect");
 dbConnect()
-server.listen(6500, () => {
-    console.log("Server Start Port -->", 6500);
+const PORT = process.env.PORT
+const HOST = process.env.HOST
+server.listen(PORT || HOST, () => {
+    console.log(`Server running at http://${HOST}:${PORT}`)
 })
-
-
-
-
-
 

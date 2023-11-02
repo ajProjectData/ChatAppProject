@@ -521,14 +521,16 @@ exports.userChat = async (req, res, next) => {
 
 exports.twoUserChatGet = async (req, res, next) => {
     try {
-        const appUserId = req.query.appUserId
+        // const appUserId = req.query.appUserId
+        const appUserId = req.user.id
         const chatUserId = req.body.chatUserId
         const groupId = req.body.groupId
 
         console.log("ap-->", appUserId);
 
         const usersId = [appUserId, chatUserId]
-
+        console.log("usersId===>",usersId);
+        if (appUserId === chatUserId) return res.status(422).json({ message: "AppUser and ChatUser are the same" })
         if (!groupId) {
             const findUser = await userModel.find({ _id: { $in: usersId } })
             if (findUser?.length <= 0) return res.status(404).json({ message: "Both UserId is Not found" })
@@ -613,6 +615,7 @@ exports.twoUserChatGet = async (req, res, next) => {
                                                     $cond: [
                                                         { $eq: ["$$msag.deleteEveryOne", true] },
                                                         {
+                                                            userId: "$$msag.userId",
                                                             message: "This Message Deleted EveryOne",
                                                             date: "$$msag.date"
                                                         },
@@ -647,7 +650,6 @@ exports.twoUserChatGet = async (req, res, next) => {
             },
             {
                 $project: {
-                    // _id: 0,
                     appUserId: new ObjectId(appUserId),
                     group: {
                         $cond: {
@@ -674,13 +676,27 @@ exports.twoUserChatGet = async (req, res, next) => {
                         }
                     },
                     Messages: {
-                        $map: {
-                            input: "$messages",
-                            as: "mesage",
+                        $let: {
+                            vars: {
+                                msg: {
+                                    $map: {
+                                        input: "$messages",
+                                        as: "mesage",
+                                        in: {
+                                            userId: "$$mesage.userId",
+                                            message: "$$mesage.message",
+                                            Date: "$$mesage.date",
+                                        },
+                                    },
+                                }
+                            },
                             in: {
-                                userId: "$$mesage.userId",
-                                message: "$$mesage.message",
-                                Date: "$$mesage.date"
+                                $sortArray: {
+                                    input: "$$msg",
+                                    sortBy: {
+                                        Date: 1
+                                    }
+                                }
                             }
                         }
                     },
@@ -835,8 +851,9 @@ exports.twoUserChatGet = async (req, res, next) => {
 
 exports.userAllContactsShow = async (req, res, next) => {
     try {
-
-        const appUserId = req.params.appUserId
+        // const appUserId = req.params.appUserId
+        const appUserId = req.user.id
+        console.log("userAllContactsShow UserId--->", appUserId);
         const findUser = await userModel.findById(appUserId)
         if (!findUser) return res.status(404).json({ message: "User is Not found" })
 
@@ -1108,15 +1125,6 @@ exports.userAllContactsShow = async (req, res, next) => {
                                 }
                             },
                             groupId: "$groupId",
-                            // {
-                            //   $cond:{
-                            //     if:{
-                            //       $eq:["$isGroup",true]
-                            //     },
-                            //     then:"$groupId",
-                            //     else:"$$REMOVE"
-                            //   }
-                            // },
                             profilePhoto: "$profilePhoto",
                             groupProfilePhoto: "$groupProfilePhoto",
                             name: {
@@ -1164,13 +1172,13 @@ exports.userAllContactsShow = async (req, res, next) => {
 
 exports.userMessageDelete = async (req, res, next) => {
     try {
-        const appUserId = req.params.appUserId
+        // const appUserId = req.params.appUserId
+        const appUserId = req.user.id
         const { chatUserId, groupId } = req.body
 
         const validateResult = await joi.messageDelete.validateAsync(req.body)
 
         let usersId = [appUserId, validateResult?.chatUserId]
-        console.log("groupId===>", groupId);
 
         if (!groupId) {
             const findUser = await userModel.find({ _id: { $in: usersId } })
@@ -1178,20 +1186,16 @@ exports.userMessageDelete = async (req, res, next) => {
             // console.log("findUser===>", findUser);
 
             let data = usersId?.filter(id => !findUser.some(user => user._id == id))
-            if (data?.length > 0) return res.status(404).json({
+            if (data?.length > 0) return res.status(404).json({ 
                 id: data[0],
                 message: "This User Is Not Found"
             })
+
+            const findChatUser = await userChatModel.find({ participantUsersId: { $all: [appUserId, chatUserId] } })
+            if (findChatUser?.length <= 0) return res.status(404).json({ message: "appUser and ChatUser Chats is Not Found" })
         }
 
         const messageDelete = await userChatModel.aggregate([
-            // {
-            //     $match: {
-            //         participantUsersId: {
-            //             $all: [new ObjectId(appUserId), new ObjectId(validateResult?.chatId)]
-            //         }
-            //     }
-            // },
             {
                 $match: {
                     $or: [
@@ -1295,7 +1299,13 @@ exports.userMessageDelete = async (req, res, next) => {
                                                         if: {
                                                             $eq: ["$$msag.deleteEveryOne", true]
                                                         },
-                                                        then: "This Message Deleted EveryOne",
+                                                        then: {
+                                                            $setField: {
+                                                                field: "message",
+                                                                input: "$$msag",
+                                                                value: "This Message Deleted EveryOne",
+                                                            },
+                                                        },
                                                         else: "$$msag"
                                                     }
                                                 }
@@ -1338,7 +1348,10 @@ exports.userMessageDelete = async (req, res, next) => {
 
 exports.messageEdit = async (req, res, next) => {
     try {
-        const appUserId = req.params.appUserId
+        // const appUserId = req.params.appUserId
+        const appUserId = req.user.id
+        console.log("---->", appUserId);
+
         // const validateResult = await joi.messageEdit.validateAsync(req.body)
 
         let usersId = [appUserId, req.body.chatUserId]
@@ -1460,7 +1473,8 @@ exports.messageEdit = async (req, res, next) => {
 /* ------------- user Group Apis ---------- */
 exports.userCreateGroup = async (req, res, next) => {
     try {
-        const userId = req.params.userId
+        // const userId = req.params.userId
+        const userId = req.user.id
         const findUser = await userModel.findById(userId)
         console.log("findUser===>", findUser);
         if (!findUser) return res.status(404).json({ message: "This User is Not found" })
@@ -1578,11 +1592,3 @@ exports.usersJoinedGroup = async (req, res, next) => {
         })
     }
 }
-
-
-
-
-// redish
-
-
-

@@ -7,24 +7,31 @@ const userChatModel = require("../Model/userChatSchema")
 const generateToken = require("../jwt/tokenGenerate")
 const fs = require("fs")
 const faker = require("faker")
+const axios = require("axios")
 
-// const redisClient = require("../redisConnect")
-// redisClient.setEx("surName", 30, JSON.stringify("hello"))
+function mobileNumberValidate(mobileNo) {
+    const mobileNoRegExp = new RegExp(/^[0-9]+$/);
+    let isMobileValid = mobileNoRegExp.test(mobileNo);
+    return isMobileValid
+}
+
 /* ---------- faker Api ---------- */
 exports.test = async (req, res) => {
     try {
         // res.send("abc")
-
-        var numEntries = 1020
+        var numEntries = 1
         let userRegister = []
         var user
         for (let i = 0; i < numEntries; i++) {
             console.log("userAdd(i)--->", i);
+            const response = await axios.get('https://picsum.photos/200/200');
+            const photoURL = response.request.res.responseUrl
             var name = faker.name.findName()
             var password = `${name.replace(/ /g, '')}@123`
             var bpass = await bcrypt.hash(password, 10)
             user = await userModel.create({
-                profilePhoto: faker.image.image(),
+                // profilePhoto: faker.image.image(),
+                profilePhoto: photoURL,
                 name: name,
                 email: faker.internet.email(name),
                 mobileNo: faker.phone.phoneNumber('##########'),
@@ -46,25 +53,60 @@ exports.test = async (req, res) => {
         })
     }
 }
-/* ----------------------------- */
+
+/* ---------- random photo add --------- */
+exports.userProfilephotoAdd = async (req, res, next) => {
+    try {
+        const findUser = await userModel.find().skip(4000)
+
+        const response = await axios.get('https://picsum.photos/200/200');
+        const photoURL = response.request.res.responseUrl
+
+        const data = []
+
+        // console.log(findUser);
+        for (i = 0; i < findUser.length; i++) {
+            console.log("i-->",i);
+            let changeImg = await userModel.findByIdAndUpdate(
+                { _id: findUser[i]._id },
+                {
+                    profilePhoto: photoURL
+                },
+                { new: true }
+            )
+            data.push(changeImg)
+        }
+
+        console.log("dataLength--->",data.length);
+
+        res.status(200).send({
+            status: true,
+            data
+        })
+
+    } catch (error) {
+        console.error("==>", error);
+        res.status(500).json({
+            error: error.message
+        })
+    }
+}
+
+/* ------------------------------------------ */
 
 exports.signUp = async (req, res, next) => {
     try {
-        // data = await redisClient.hGetAll("userRegister")
-        // console.log("-->", JSON.parse(JSON.stringify(data)));
-
-        // console.log("body--->", req.body);
-        // console.log("file--->", req.file);
         const validateResult = await joi.signUp.validateAsync(req.body)
 
         const findEmail = await userModel.findOne({ email: validateResult?.email })
         if (findEmail) return res.status(201).json({ message: "Email Already Exist" })
 
+        const isMobileValid = mobileNumberValidate(validateResult?.mobileNo)
+        if (isMobileValid === false) return res.status(422).json({ message: "Mobile Number Accept Only Numeric Value" })
         const findMobileNo = await userModel.findOne({ mobileNo: validateResult?.mobileNo })
         if (findMobileNo) return res.status(201).json({ message: "This Mobile Number Already Exist" })
 
-        const profilePhoto = req.file.filename
-        // console.log("===>",);
+        const profilePhoto = req?.file?.filename
 
         const bpass = await bcrypt.hash(validateResult?.password, 10)
 
@@ -76,8 +118,7 @@ exports.signUp = async (req, res, next) => {
             profilePhoto: profilePhoto,
         })
 
-        // await redisClient.hSet("userRegister", `'${userRegister._id}'`, JSON.stringify(userRegister))
-
+        console.log("userSignUp====>", userRegister)
         res.status(200).send({
             status: true,
             userRegister
@@ -94,8 +135,9 @@ exports.signUp = async (req, res, next) => {
 exports.loginSendOtp = async (req, res, next) => {
     try {
         const validateResult = await joi.login.validateAsync(req.body)
-        console.log("--->", validateResult);
 
+        const isMobileValid = mobileNumberValidate(validateResult?.mobileNo)
+        if (isMobileValid === false) return res.status(422).json({ message: "Mobile Number Accept Only Numeric Value" })
         const findMobileNo = await userModel.findOne({ mobileNo: validateResult?.mobileNo })
         if (!findMobileNo) return res.status(201).json({ message: "Mobile Number Is Not Found" })
 
@@ -109,16 +151,25 @@ exports.loginSendOtp = async (req, res, next) => {
 
         const otpUserFind = await otpModel.findOne({ mobileNo: findMobileNo.mobileNo })
         if (otpUserFind) {
-            sendOtp = await otpModel.findByIdAndUpdate(otpUserFind._id, {
-                $set: { otp: otpGenerate }
-            }, { new: true })
+            sendOtp = await otpModel.findByIdAndUpdate(
+                otpUserFind._id,
+                {
+                    $set: {
+                        otp: otpGenerate,
+                        otpExpire: Date.now() + 90 * 1000
+                    },
+                },
+                { new: true }
+            )
         } else {
             sendOtp = await otpModel.create({
                 otp: otpGenerate,
-                mobileNo: findMobileNo.mobileNo
+                mobileNo: findMobileNo.mobileNo,
+                otpExpire: Date.now() + 90 * 1000
             })
         }
 
+        console.log("loginSendOtp---->", sendOtp);
         res.status(200).json({
             status: "OTP Send SuccessFully",
             token,
@@ -126,7 +177,6 @@ exports.loginSendOtp = async (req, res, next) => {
         })
     } catch (error) {
         console.error("error==>", error.message);
-        // console.error("==>", error.details[0].message);
         res.status(500).json({
             error: error.message
         })
@@ -142,10 +192,12 @@ exports.addOtpUserLogin = async (req, res, next) => {
 
         let checkUser = await otpModel.findOne({ mobileNo: findMobileNo?.mobileNo })
 
-        if (checkUser.mobileNo !== validateResult.mobileNo) {
-            return res.status().json({ message: "Please Enter Correct Mobile Number" })
+        // console.log("checkUser?.otpExpire==>", checkUser?.otpExpire > Date.now());
+        if (checkUser?.mobileNo !== validateResult?.mobileNo) {
+            return res.status(422).json({ message: "Please Enter Correct Mobile Number" })
         }
         if (checkUser?.otp !== validateResult.otp) return res.status(401).json({ message: "Please Enter Correct OTP" });
+        if (checkUser?.otpExpire < Date.now()) return res.status(401).json({ message: "OTP Is Expire ReSend OTP" });
 
         const userLogin = await otpModel.aggregate([
             {
@@ -187,51 +239,25 @@ exports.addOtpUserLogin = async (req, res, next) => {
 
 exports.userDetailsUpdate = async (req, res, next) => {
     try {
-        const userId = req.params.userId
+        // const userId = req.params.userId
+        const userId = req.user.id
         const validateResult = await joi.userProfileUpdate.validateAsync(req.body)
 
         const findUser = await userModel.findById(userId)
         if (!findUser) return res.status(201).json({ message: "User Is Not Found" })
 
-        if (findUser?.email !== validateResult?.email) {
-            return res.status(404).json({ message: "Email is Not Match" })
-        }
-
-        // let findEmail
-        // if (findUser?.email !== validateResult?.email) {
-        //     findEmail = await userModel.findOne({ email: validateResult?.email })
-        // }
-        // if (findEmail) return res.status(404).json({message:"This Email is Already Used"})
-
-        let findMobileNo
-        console.log("findMobileNo1===>", findMobileNo);
-        console.log(findUser?.mobileNo != validateResult?.mobileNo);
-        if (findUser?.mobileNo !== validateResult?.mobileNo) {
-            findMobileNo = await userModel.findOne({ mobileNo: validateResult?.mobileNo })
-            console.log("findMobileNo2===>", findMobileNo);
-        }
-        if (findMobileNo) return res.status(404).json({ message: "This Mobile Number is Already Used" })
-        console.log("findMobileNo3===>", findMobileNo);
-
-
-        let profilePhoto = req?.file?.filename
-        console.log("profilePhoto===>", profilePhoto);
+        const profilePhoto = req?.file?.filename
 
         if (profilePhoto !== undefined && fs.existsSync(`profilePhoto/${findUser.profilePhoto}`)) {
             fs.unlinkSync(`profilePhoto/${findUser.profilePhoto}`)
         }
-        console.log("findUser==>", findUser);
-        console.log("req?.file===>", req?.file);
 
         const detailsUpdate = await userModel.findByIdAndUpdate(findUser._id,
             {
-                // $set:{
-                name: validateResult?.name,
-                email: validateResult.email,
-                // password: validateResult.password,
-                mobileNo: validateResult.mobileNo,
-                profilePhoto: profilePhoto
-                // }
+                $set: {
+                    name: validateResult?.name,
+                    profilePhoto: profilePhoto
+                }
             },
             { new: true }
         )
@@ -251,14 +277,12 @@ exports.userDetailsUpdate = async (req, res, next) => {
 
 exports.forgetPassword = async (req, res, next) => {
     try {
-
         const validateResult = await joi.forgetPass.validateAsync(req.body)
 
         const findMobileNo = await userModel.findOne({ mobileNo: validateResult?.mobileNo })
         if (!findMobileNo) return res.status(404).json({ message: "This MobileNo Is Not Found" })
 
         const bpass = await bcrypt.hash(validateResult?.newPassword, 10)
-        console.log("bPass--->", bpass);
 
         const userPassChange = await userModel.findByIdAndUpdate(
             { _id: findMobileNo._id },

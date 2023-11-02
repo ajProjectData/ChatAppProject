@@ -8,6 +8,9 @@ const otpSchema = new mongoose.Schema({
     mobileNo:{
         type:String,
         // ref:'user'   
+    },
+    otpExpire: {
+        type: Date
     }
 },{
     timestamps:true

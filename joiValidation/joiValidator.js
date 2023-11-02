@@ -13,12 +13,13 @@ const signUp = Joi.object({
     name: Joi.string().trim().required(),
     email: Joi.string().email().trim().required(),
     mobileNo: Joi.string().length(10).trim().required(),
-    password: Joi.string().trim().regex(new RegExp(passwordPattern)).message(passwordError).required()
+    password: Joi.string().trim().regex(new RegExp(passwordPattern)).message(passwordError).required(),
+    profileImg: Joi.string().optional().allow('')
 })
 
 const login = Joi.object({
     mobileNo: Joi.string().length(10).trim().required(),
-    password: Joi.string().trim().regex(new RegExp(passwordPattern)).message(passwordError).required()
+    password: Joi.string().trim().required()
 })
 
 const otp = Joi.object({
@@ -28,8 +29,6 @@ const otp = Joi.object({
 
 const userProfileUpdate = Joi.object({
     name: Joi.string().trim(),
-    email: Joi.string().email().trim(),
-    mobileNo: Joi.string().length(10).trim(),
     profileImg: Joi.string().optional().allow('')
 })
 
